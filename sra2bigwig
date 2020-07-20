@@ -15,6 +15,9 @@ mkdir mapped
 
 while [ 1 ]
 do
+   # to avoid multiple threads working on the same file
+   sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
+
    fastq_files=`ls downloaded/*.fastq`
 
    for input in $fastq_files

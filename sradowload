@@ -50,6 +50,9 @@ do
   # this is needed because sra file transfer frequently stopped
   rm /home/local/ARCS/xw2629/ncbi/public/sra/*.sra.lock
 
+  # for multiple threads
+  sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
+
   # if another thread already started 
   if [ -f $sra_id.downloading ];then
 	  continue
@@ -96,7 +99,8 @@ do
   # if more than 10 files in the queue
   while [ $(du downloaded | cut -f 1) -gt $max_space ] && [ $(ls downloaded | wc -l) -gt $max_file ]
   do
-     sleep 1
+     # to avoid multiple threads working on the same file
+     sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
   done
   
 done < "$input"
