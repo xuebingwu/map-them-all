@@ -11,6 +11,8 @@
 # sra-tools: sra-stat, prefetch, fastq-dump, 
 # parallel-fastq-dump
 
+# usage: sradownload acc_list_file
+
 # all RNA-seq data ID (SRR***) as of 7/17
 # access: public; source:RNA; platform:illumina, filetype: fastq
 input="SraAccList.txt"
@@ -18,6 +20,11 @@ input="SraAccList.txt"
 # to maximize diversity at the begining, shuffle the data
 #shuf SraAccList.txt > SraAccList_shuffled.txt
 input="SraAccList_shuffled.txt"
+
+
+input="atherosclerosis.ids"
+
+input=$(realpath $1) #
 
 # max number of reads. some data has 100 million reads causing problem in STAR
 max_num=40000000
@@ -28,6 +35,11 @@ max_file=10
 
 # total file size
 max_space=50000000
+
+output="/home/local/ARCS/xw2629/xuebing/SRA"
+
+mkdir $output
+cd $output
 
 mkdir downloaded # fastq files
 mkdir small # sra ids for data with too few reads
@@ -70,7 +82,7 @@ do
 
   # convert to fastq using multi thread. fasterqdump isn't working
   echo "parallel-fastq-dump $sra_id"
-  ~/software/parallel-fastq-dump/parallel-fastq-dump --sra-id $sra_id --threads 8 --split-files --maxSpotId $max_num
+  ~/software/parallel-fastq-dump/parallel-fastq-dump --sra-id $sra_id --threads 4 --split-files --maxSpotId $max_num
 
   # move downloaded fastq file. Only use read 1 if paired-end data 
   mv $sra_id\_1.fastq downloaded 
