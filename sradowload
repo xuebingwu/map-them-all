@@ -11,7 +11,7 @@
 # sra-tools: sra-stat, prefetch, fastq-dump, 
 # parallel-fastq-dump
 
-# usage: sradownload acc_list_file
+# usage: sradownload acc_list_file output
 
 # all RNA-seq data ID (SRR***) as of 7/17
 # access: public; source:RNA; platform:illumina, filetype: fastq
@@ -36,7 +36,7 @@ max_file=10
 # total file size
 max_space=50000000
 
-output="/home/local/ARCS/xw2629/xuebing/SRA"
+output=$(realpath $2)
 
 mkdir $output
 cd $output
