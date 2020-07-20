@@ -1,1 +1,1 @@
-./query.sh mapped/ newlinc.bed | sort -nk 2
+./query.sh ../SRA/mapped/ target.bed | sort -nk 2
