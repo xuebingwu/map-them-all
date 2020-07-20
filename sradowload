@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# script to download all RNA-seq data in SRA as of 7/17/2020
+# one file a time, once completed, move the fastq file to ./downloaded
+# which will be mapped by another script sra2bw_fast
+# when processed (bigwig file, junciton file, and log), remove the fastq file
+# pause downloading if there are >10 downloaded fastq files to be processed
+# only use the first 40 million reads of each data, minimum 10 million reads
+
+# required tools: 
+# sra-tools: sra-stat, prefetch, fastq-dump, 
+# parallel-fastq-dump
+
+# all RNA-seq data ID (SRR***) as of 7/17
+# access: public; source:RNA; platform:illumina, filetype: fastq
+input="SraAccList.txt"
+
+# to maximize diversity at the begining, shuffle the data
+#shuf SraAccList.txt > SraAccList_shuffled.txt
+input="SraAccList_shuffled.txt"
+
+# max number of reads. some data has 100 million reads causing problem in STAR
+max_num=40000000
+min_num=10000000 # skip downloading if too few reads
+
+# max num of fastq file to store before mapping
+max_file=10
+
+# total file size
+max_space=50000000
+
+mkdir downloaded # fastq files
+mkdir small # sra ids for data with too few reads
+
+# each line is an SRA ID
+while IFS= read -r sra_id
+do
+  # this is needed because sra file transfer frequently stopped
+  rm /home/local/ARCS/xw2629/ncbi/public/sra/*.sra.lock
+
+  # if another thread already started 
+  if [ -f $sra_id.downloading ];then
+	  continue
+  fi
+
+  echo `date` "==="$sra_id "==="
+
+  # this marks a thread has started downloading the data
+  touch $sra_id.downloading
+
+  # if already processed (if this script was aborted and started again)
+  if [ -f "mapped/$sra_id.+.bw" ] || [ -f "small/$sra_id" ];then
+          echo "$sra_id already processed. skipping"
+	  rm $sra_id.downloading
+          continue
+  fi
+
+  echo $sra_id ": checking total number of reads/spots"
+  num_spot=$(sra-stat --meta --quick $sra_id | cut -d'|' -f 3 | cut -d':' -f 1 | awk '{s+=$1} END {print s}')
+
+  if [ $num_spot -lt $min_num ];then
+     echo "$sra_id has too few reads: " $num_spot
+     rm $sra_id.downloading
+     touch small/$sra_id
+     continue
+  fi
+
+  echo "prefetch $sra_id" 
+  prefetch $sra_id
+
+  # convert to fastq using multi thread. fasterqdump isn't working
+  echo "parallel-fastq-dump $sra_id"
+  ~/software/parallel-fastq-dump/parallel-fastq-dump --sra-id $sra_id --threads 8 --split-files --maxSpotId $max_num
+
+  # move downloaded fastq file. Only use read 1 if paired-end data 
+  mv $sra_id\_1.fastq downloaded 
+
+  # remove other files
+  rm $sra_id*.fastq
+  rm /home/local/ARCS/xw2629/ncbi/public/sra/$sra_id* 
+
+  rm $sra_id.downloading
+
+  # if more than 10 files in the queue
+  while [ $(du downloaded | cut -f 1) -gt $max_space ] && [ $(ls downloaded | wc -l) -gt $max_file ]
+  do
+     sleep 1
+  done
+  
+done < "$input"
+

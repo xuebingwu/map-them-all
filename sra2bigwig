@@ -1,0 +1,48 @@
+#!/bin/bash
+
+STAR_options="--runThreadN 4 --genomeLoad LoadAndKeep --limitBAMsortRAM 20000000000 --genomeDir /home/local/ARCS/xw2629/genomes/indexes/STAR/hg38 --outSAMtype BAM SortedByCoordinate --outWigType wiggle read1_5p --outFilterType BySJout --outFilterMultimapNmax 20 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.04 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000"
+
+chrsize=/home/local/ARCS/xw2629/genomes/sequences/hg38.chrom.sizes
+
+# min number of lines in fastq file, divided by 4 is the number of reads
+min_line=40000000
+
+mkdir mapped
+
+while [ 1 ]
+do
+   fastq_files=`ls downloaded/*.fastq`
+
+   for input in $fastq_files
+   do 
+      sample=$(echo $input | cut -d'/' -f 2 | cut -d '_' -f 1)
+      if [ -d $sample ]; then # another STAR is processing the same file
+              echo "folder exist, may be another STAR is processing this file. skip"
+              continue
+      fi
+
+      echo "mapping $sample"
+      mkdir $sample
+      mv $input $sample/input.fastq
+      cd $sample
+
+      nline=$(wc -l < input.fastq) 
+
+      if [ $nline -lt $min_line ]
+      then
+	      echo "$sample has too few reads: " $nline
+	      cd ..
+	      rm -rf $sample
+	      break
+      fi
+
+      STAR $STAR_options --readFilesIn input.fastq --outFileNamePrefix $sample.
+      wigToBigWig $sample.Signal.UniqueMultiple.str1.out.wig $chrsize $sample.-.bw
+      wigToBigWig $sample.Signal.UniqueMultiple.str2.out.wig $chrsize $sample.+.bw
+      gzip $sample.SJ.out.tab --force
+      mv $sample.?.bw $sample.Log.final.out $sample.SJ.out.tab.gz ../mapped
+      cd ..
+      rm -rf $sample
+      break # update file list
+   done
+done
