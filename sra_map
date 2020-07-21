@@ -15,10 +15,15 @@ mkdir mapped
 
 while [ 1 ]
 do
-   # to avoid multiple threads working on the same file
-   sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
+   # if no fastq file available
+   if [ ! "$(ls -A downloaded)" ];then
+	   continue
+   fi
 
    fastq_files=`ls downloaded/*.fastq`
+
+   # to avoid multiple threads working on the same file
+   sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
 
    for input in $fastq_files
    do 

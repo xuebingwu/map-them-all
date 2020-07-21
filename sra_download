@@ -11,7 +11,38 @@
 # sra-tools: sra-stat, prefetch, fastq-dump, 
 # parallel-fastq-dump
 
-# usage: sradownload acc_list_file output
+# usage: sradownload acc_list_file output n_thread
+
+help () {
+ echo ""
+ echo "Usage: sra_download acc_list_file [options]"
+ echo ""
+ echo "Input:"
+ echo "    acc_list_file   A text file with each line being a SRA ID (SRR****)"
+ echo "Options:"
+ echo "    -out <folder>   Output path/folder name. Default: SRA"
+ echo "    -thread <N>     Number of threads for parallel-fastq-dump. Default: 4"
+ echo "    -max_read <N>   The max number of reads to download. Default: 40000000"  
+ echo "    -min_read <N>   Skip a data if too few reads. Default: 10000000"
+ echo "    -disk_space <N> Max disk space (KB) for fastq files (default: 50000000)"
+ echo "    -num_file <N>   Max num of fastq files to store (default: 10)"
+ echo ""
+ echo "Output:"
+ echo "    downloaded      Fastq files that have been downloaded"
+ echo "    too_few	   Empty files of SRA IDs with too few reads"
+ echo "    partial         Empty files of SRA IDs with too many reads"
+ echo "    too_large       Empty files of SRA IDs with too large sra file (>20Gb)"
+ echo ""
+ echo "Required to run:"
+ echo "    sra-tools (sra-stat, prefetch, fastq-dump)"
+ echo "    parallel-fastq-dump"
+ echo ""
+ echo "Example:"
+ echo "	   sra_download sra_ids.txt"
+ echo "    sra_downlaod sra_ids.txt -thread 8"
+}
+
+
 
 # all RNA-seq data ID (SRR***) as of 7/17
 # access: public; source:RNA; platform:illumina, filetype: fastq
@@ -96,7 +127,7 @@ do
   rm $sra_id.downloading
 
   # if more than 10 files in the queue
-  while [ $(du downloaded | cut -f 1) -gt $max_space ] && [ $(ls downloaded | wc -l) -gt $max_file ]
+  while [ $(du downloaded | cut -f 1) -ge $max_space ] && [ $(ls downloaded | wc -l) -ge $max_file ]
   do
      # to avoid multiple threads working on the same file
      sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
