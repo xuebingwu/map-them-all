@@ -9,7 +9,6 @@
 
 # required tools: 
 # sra-tools: sra-stat, prefetch, fastq-dump, 
-# parallel-fastq-dump
 
 # usage: sradownload acc_list_file output n_thread
 
@@ -18,56 +17,79 @@ help () {
  echo "Usage: sra_download acc_list_file [options]"
  echo ""
  echo "Input:"
- echo "    acc_list_file   A text file with each line being a SRA ID (SRR****)"
+ echo "    -id_list        A text file with each line being a SRA ID (SRR****)"
  echo "Options:"
- echo "    -out <folder>   Output path/folder name. Default: SRA"
+ echo "    -output <folder>   Output path/folder name. Default: SRA"
  echo "    -thread <N>     Number of threads for parallel-fastq-dump. Default: 4"
- echo "    -max_read <N>   The max number of reads to download. Default: 40000000"  
- echo "    -min_read <N>   Skip a data if too few reads. Default: 10000000"
+ echo "    -max_read <N>   The max number of reads to download. Default: 40000000"
+ echo "                    The rest of the reads in the data set will be skipped" 
+ echo "    -min_read <N>   Skip a data set if too few reads. Default: 10000000"
  echo "    -disk_space <N> Max disk space (KB) for fastq files (default: 50000000)"
  echo "    -num_file <N>   Max num of fastq files to store (default: 10)"
+ echo "                    Downloading will pause when both -disk_space and -num_file"
+ echo "                    exceed the limit."
  echo ""
  echo "Output:"
  echo "    downloaded      Fastq files that have been downloaded"
- echo "    too_few	   Empty files of SRA IDs with too few reads"
- echo "    partial         Empty files of SRA IDs with too many reads"
- echo "    too_large       Empty files of SRA IDs with too large sra file (>20Gb)"
+ echo "    small	   Empty files of SRA IDs with too few reads (< min_read)"
  echo ""
  echo "Required to run:"
  echo "    sra-tools (sra-stat, prefetch, fastq-dump)"
- echo "    parallel-fastq-dump"
  echo ""
  echo "Example:"
- echo "	   sra_download sra_ids.txt"
+ echo "    sra_download sra_ids.txt"
  echo "    sra_downlaod sra_ids.txt -thread 8"
 }
 
+input=""
+thread="1"
+output="SRA"
+min_read=10000000
+max_read=40000000
+disk_space=50000000
+num_file=10
 
+# parse commandline arguments
+while [ $# -gt 0 ]
+do
+    case "$1" in
+	-id_list) input="$2"; shift;;
+        -thread) thread="$2"; shift;;
+        -max_read) max_read="$2"; shift;;
+        -min_read) min_read="$2"; shift;;
+        -disk_space) disk_space=$2; shift;;
+        -output) output=$2; shift;;
+        -num_file) num_file=$2; shift;;
+        -h) help;exit 0;;
+        --help) help;exit 0;;
+	--) shift; break;;
+	-*)
+	    echo '';echo "****** unknown option: $1 ******";echo ''; 1>&2; help; exit 1;;
+	*)  break;;	# terminate while loop
+    esac
+    shift
+done
+
+if [ -z "$input" ];then
+	echo "ERROR: -id_list file required"
+	help
+	exit 
+elif [ ! -f "$input" ];then
+	echo "The SRA ID list file does not exist: " $input
+	exit
+fi
 
 # all RNA-seq data ID (SRR***) as of 7/17
 # access: public; source:RNA; platform:illumina, filetype: fastq
-input="SraAccList.txt"
+# input="SraAccList.txt"
 
 # to maximize diversity at the begining, shuffle the data
 #shuf SraAccList.txt > SraAccList_shuffled.txt
-input="SraAccList_shuffled.txt"
+# input="SraAccList_shuffled.txt"
 
+input=$(realpath $input) #
 
-input="atherosclerosis.ids"
-
-input=$(realpath $1) #
-
-# max number of reads. some data has 100 million reads causing problem in STAR
-max_num=40000000
-min_num=10000000 # skip downloading if too few reads
-
-# max num of fastq file to store before mapping
-max_file=10
-
-# total file size
-max_space=50000000
-
-output=$(realpath $2)
+output=$(realpath $output)
 
 mkdir $output
 cd $output
@@ -79,7 +101,7 @@ mkdir small # sra ids for data with too few reads
 while IFS= read -r sra_id
 do
   # this is needed because sra file transfer frequently stopped
-  rm /home/local/ARCS/xw2629/ncbi/public/sra/*.sra.lock
+  rm ~/ncbi/public/sra/*.sra.lock
 
   # if another thread already started 
   if [ -f $sra_id.downloading ];then
@@ -101,7 +123,7 @@ do
   echo $sra_id ": checking total number of reads/spots"
   num_spot=$(sra-stat --meta --quick $sra_id | cut -d'|' -f 3 | cut -d':' -f 1 | awk '{s+=$1} END {print s}')
 
-  if [ $num_spot -lt $min_num ];then
+  if [ $num_spot -lt $min_read ];then
      echo "$sra_id has too few reads: " $num_spot
      rm $sra_id.downloading
      touch small/$sra_id
@@ -113,21 +135,24 @@ do
 
   if [ -f ~/ncbi/public/sra/$sra_id.sra ]; then
   	# convert to fastq using multi thread. fasterqdump isn't working
-  	echo "parallel-fastq-dump $sra_id"
-  	~/software/parallel-fastq-dump/parallel-fastq-dump --sra-id $sra_id --threads 4 --split-files --maxSpotId $max_num
-
+        if [ $thread -gt 1 ]; then
+		echo "parallel-fastq-dump $sra_id"
+  		~/software/parallel-fastq-dump/parallel-fastq-dump --sra-id $sra_id --threads $thread --split-files --maxSpotId $max_read
+	else
+		fastq-dump $sra_id --split-files --maxSpotId $max_read
+	fi
   	# move downloaded fastq file. Only use read 1 if paired-end data 
   	mv $sra_id\_1.fastq downloaded 
   fi
 
   # remove other files
   rm $sra_id*.fastq
-  rm /home/local/ARCS/xw2629/ncbi/public/sra/$sra_id* 
+  rm ~/ncbi/public/sra/$sra_id* 
 
   rm $sra_id.downloading
 
   # if more than 10 files in the queue
-  while [ $(du downloaded | cut -f 1) -ge $max_space ] && [ $(ls downloaded | wc -l) -ge $max_file ]
+  while [ $(du downloaded | cut -f 1) -ge $disk_space ] && [ $(ls downloaded | wc -l) -ge $num_file ]
   do
      # to avoid multiple threads working on the same file
      sleep .$[ ( $RANDOM % 10000 )  + 1 ]s
