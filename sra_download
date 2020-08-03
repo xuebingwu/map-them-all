@@ -102,6 +102,8 @@ while IFS= read -r sra_id
 do
   # this is needed because sra file transfer frequently stopped
   rm ~/ncbi/public/sra/*.sra.lock
+  rm ~/ncbi/public/sra/*.sra.cache
+  find ~/ncbi/public/sra/* -mtime +1 -exec rm {} \; # remove any file older than 1 day
 
   # if another thread already started 
   if [ -f $sra_id.downloading ];then
@@ -114,7 +116,7 @@ do
   touch $sra_id.downloading
 
   # if already processed (if this script was aborted and started again)
-  if [ -f "mapped/$sra_id.+.bw" ] || [ -f "small/$sra_id" ];then
+  if [ -f "mapped/$sra_id.+.bw" ] || [ -f "small/$sra_id" ] || [ -d $sra_id ] || [ -f downloaded/$sra_id\_1.fastq ] ;then
           echo "$sra_id already processed. skipping"
 	  rm $sra_id.downloading
           continue
