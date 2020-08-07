@@ -1,8 +1,14 @@
 #!/bin/bash
 
-STAR_options="--runThreadN 1 --genomeLoad LoadAndKeep --limitBAMsortRAM 20000000000 --genomeDir /home/local/ARCS/xw2629/genomes/indexes/STAR/hg38 --outSAMtype BAM SortedByCoordinate --outWigType wiggle read1_5p --outFilterType BySJout --outFilterMultimapNmax 20 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.04 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000"
+STAR_options="--runThreadN 4 --genomeLoad LoadAndKeep --limitBAMsortRAM 20000000000 --genomeDir /home/local/ARCS/xw2629/genomes/indexes/STAR/hg38 --outSAMtype BAM SortedByCoordinate --outWigType wiggle read1_5p --outFilterType BySJout --outFilterMultimapNmax 20 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.04 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000"
 
 chrsize=/home/local/ARCS/xw2629/genomes/sequences/hg38.chrom.sizes
+bed_plus="/home/local/ARCS/xw2629/genomes/annotations/hg38refseq.processed+.bed"
+bed_minus="/home/local/ARCS/xw2629/genomes/annotations/hg38refseq.processed-.bed"
+
+# min uniquely mapped reads
+minRead=5000000
+
 
 # min number of lines in fastq file, divided by 4 is the number of reads
 min_line=40000000
@@ -50,7 +56,18 @@ do
       wigToBigWig $sample.Signal.UniqueMultiple.str1.out.wig $chrsize $sample.-.bw
       wigToBigWig $sample.Signal.UniqueMultiple.str2.out.wig $chrsize $sample.+.bw
       gzip $sample.SJ.out.tab --force
-      mv $sample.?.bw $sample.Log.final.out $sample.SJ.out.tab.gz ../mapped
+
+      # get number of uniquely mapped reads
+      uniqReads=$(more $sample.Log.final.out | grep "Uniquely mapped reads number" | cut -f 2)
+      if [ $uniqReads -lt $minRead ];then
+	echo "$sample: not enough reads: $uniqReads"
+      else
+        echo "$sample: computing coverage"
+        bigWigDensity $sample.+.bw $sample.-.bw $bed_plus $bed_minus $sample
+        gzip $sample.coverage --force
+      fi
+
+      mv $sample.?.bw $sample.Log.final.out $sample.SJ.out.tab.gz $sample.coverage.gz  ../mapped
       cd ..
       rm -rf $sample
       break # update file list

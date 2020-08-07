@@ -16,6 +16,7 @@ do
    sraid=$(echo $filename | cut -d'.' -f 1)
 
    if [ -f $sraid.coverage ]; then
+     echo "skip $sraid"
      continue
    fi
 

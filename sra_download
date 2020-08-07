@@ -20,7 +20,7 @@ help () {
  echo "    -id_list        A text file with each line being a SRA ID (SRR****)"
  echo "Options:"
  echo "    -output <folder>   Output path/folder name. Default: SRA"
- echo "    -thread <N>     Number of threads for parallel-fastq-dump. Default: 4"
+ echo "    -thread <N>     Number of threads for parallel-fastq-dump. Default: 1"
  echo "    -max_read <N>   The max number of reads to download. Default: 40000000"
  echo "                    The rest of the reads in the data set will be skipped" 
  echo "    -min_read <N>   Skip a data set if too few reads. Default: 10000000"
@@ -102,8 +102,12 @@ while IFS= read -r sra_id
 do
   # this is needed because sra file transfer frequently stopped
   rm ~/ncbi/public/sra/*.sra.lock
-  rm ~/ncbi/public/sra/*.sra.cache
-  find ~/ncbi/public/sra/* -mtime +1 -exec rm {} \; # remove any file older than 1 day
+
+  if [ $(du ~/ncbi/public/sra/ | cut -f 1) -ge $disk_space ];then
+    rm ~/ncbi/public/sra/*.sra.cache
+    find ~/ncbi/public/sra/* -mtime +1 -exec rm {} \; # remove any file older than 1 day
+    # note that some sra files can be years old even if just downloaded 
+  fi
 
   # if another thread already started 
   if [ -f $sra_id.downloading ];then
@@ -116,7 +120,7 @@ do
   touch $sra_id.downloading
 
   # if already processed (if this script was aborted and started again)
-  if [ -f "mapped/$sra_id.+.bw" ] || [ -f "small/$sra_id" ] || [ -d $sra_id ] || [ -f downloaded/$sra_id\_1.fastq ] ;then
+  if [ -f "mapped/$sra_id.Log.final.out" ] || [ -f "small/$sra_id" ] || [ -d $sra_id ] || [ -f downloaded/$sra_id\_1.fastq ] ;then
           echo "$sra_id already processed. skipping"
 	  rm $sra_id.downloading
           continue
