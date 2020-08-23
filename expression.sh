@@ -1,6 +1,7 @@
 # script to get summary of all transcripts
 
 bw_folder="/home/local/ARCS/xw2629/xuebing/SRA/mapped"
+bw_folder=$1
 bed_plus="/home/local/ARCS/xw2629/genomes/annotations/hg38refseq.processed+.bed"
 bed_minus="/home/local/ARCS/xw2629/genomes/annotations/hg38refseq.processed-.bed"
 
@@ -15,7 +16,7 @@ do
    filename=$(basename $file)
    sraid=$(echo $filename | cut -d'.' -f 1)
 
-   if [ -f $sraid.coverage ]; then
+   if [ -f $sraid.coverage.gz ]; then
      echo "skip $sraid"
      continue
    fi
@@ -35,4 +36,5 @@ do
 
    echo "$sraid: computing coverage"
    bigWigDensity $sraid.+.bw $sraid.-.bw $bed_plus $bed_minus $sraid
+   gzip $sraid.coverage
 done
