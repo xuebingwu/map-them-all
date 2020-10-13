@@ -1,5 +1,8 @@
 cd /home/local/ARCS/xw2629/xuebing/map-them-all
-for i in {6..10}
+
+STAR --genomeLoad LoadAndExit --genomeDir ~/genomes/indexes/STAR/hg38
+
+for i in {10..10}
 do
     echo $i
 
@@ -7,7 +10,7 @@ do
 
      sleep 1s
 
-     #./sra_map.sh ../SRA 10.115.56.200 xw2629 wulab@CUMC2018 &
+     ./sra_map.sh ../SRA 10.115.56.200 xw2629 wulab@CUMC2018 &
 
 done
 
