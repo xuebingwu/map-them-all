@@ -27,10 +27,12 @@ while [ 1 ]
 do
    # if no fastq file available
    if [ ! "$(ls -A downloaded)" ];then
-       sleep $[ ( $RANDOM % 100 )  + 600 ]s
        if [ ! "$(ls -A downloading)" ];then # if no files being downloaded, stop
-           echo [`date`]  "no fastq files. exit"
-           exit
+	   sleep 10s
+	   if [ ! "$(ls -A downloading)" ];then  
+           	echo [`date`]  "no fastq files. exit"
+           	exit
+	   fi
        fi
    fi
 
